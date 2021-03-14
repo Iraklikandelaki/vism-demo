@@ -220,8 +220,9 @@
 			controls.maxDistance = 100;
 			controls.enablePan = false;
 			controls.enableZoom = false;
+			
 			controls.addEventListener( 'change', render );
-
+			controls.update();	
 			// scene.add( new THREE.AmbientLight( 0x404040, 1 ) );
 
 			const light = new THREE.AmbientLight( 0x404040, 2 ); // soft white light
