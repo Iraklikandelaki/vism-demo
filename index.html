@@ -214,6 +214,8 @@
 			controls.maxPolarAngle = Math.PI * 0.5;
 			controls.minDistance = 1;
 			controls.maxDistance = 100;
+			controls.enableZoom = false;
+			controls.enablePan = false;
 			controls.addEventListener( 'change', render );
 
 			// scene.add( new THREE.AmbientLight( 0x404040, 1 ) );
@@ -371,7 +373,7 @@
 					// sphere.scale.setScalar( Math.random() * Math.random() + 0.5 );
 					scene.add( sphere );
 					movableObjs.push(sphere);
-					console.log(movableObjs)
+					// console.log(movableObjs)
 					// console.log(scene.children)
 					sphere.layers.enable( BLOOM_SCENE );
 
@@ -450,7 +452,7 @@
 								});
 								bottle2.scale.set(50,50,50);
 								scene.add(bottle2);
-								console.log(bottle2)
+								// console.log(bottle2)
 								render();
 							});
 
