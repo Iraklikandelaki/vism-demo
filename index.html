@@ -440,42 +440,6 @@
 					pointlight4.position.set(20, 0, 90);
 					scene.add(pointlight4);
 						
-						const loader = new GLTFLoader().setPath("./glbbottle/");
-							loader.load("scene.glb", function (gltf) {
-								bottle2 = gltf.scene;
-								bottle2.rotation.y = -2.8;
-								bottle2.position.y = -9.4;
-								bottle2.position.x = 3;
-								bottle2.traverse(function (child) {
-								if (child.isMesh) {
-								}
-								});
-								bottle2.scale.set(50,50,50);
-								scene.add(bottle2);
-								// console.log(bottle2)
-								render();
-							});
-
-							loader.load("scene.glb", function (gltf) {
-								bottle3 = gltf.scene;
-								bottle3.rotation.y = -2.8;
-								bottle3.rotation.z = -0.2;
-
-
-								bottle3.position.y = -9.4;
-								bottle3.position.z = 2.4;
-
-								
-								bottle3.position.x = 2;
-								bottle3.traverse(function (child) {
-								if (child.isMesh) {
-								}
-								});
-								bottle3.scale.set(50,50,50);
-								scene.add(bottle3);
-								// console.log(bottle3)
-								
-							});
 						
 				render();
 
