@@ -1,3 +1,34 @@
+Skip to content
+Search or jump to…
+
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@Iraklikandelaki 
+Iraklikandelaki
+/
+vism-demo
+1
+00
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+vism-demo/index.html
+@Iraklikandelaki
+Iraklikandelaki Update index.html
+Latest commit 4f73e55 6 minutes ago
+ History
+ 1 contributor
+601 lines (435 sloc)  16.3 KB
+  
 <!DOCTYPE html>
 <html lang="en">
 	<head>
@@ -357,7 +388,7 @@
 
 				const geometry = new THREE.SphereGeometry( 0.3, 60 );
 
-				for ( let i = 0; i < 300; i ++ ) {
+				for ( let i = 0; i < 80; i ++ ) {
 
 					const color = new THREE.Color();
 					color.setHSL( Math.random(), 0.8, Math.random() * 0.2 + 0.05 );
@@ -440,6 +471,42 @@
 					pointlight4.position.set(20, 0, 90);
 					scene.add(pointlight4);
 						
+						const loader = new GLTFLoader().setPath("./glbbottle/");
+							loader.load("scene.glb", function (gltf) {
+								bottle2 = gltf.scene;
+								bottle2.rotation.y = -2.8;
+								bottle2.position.y = -9.4;
+								bottle2.position.x = 3;
+								bottle2.traverse(function (child) {
+								if (child.isMesh) {
+								}
+								});
+								bottle2.scale.set(50,50,50);
+								scene.add(bottle2);
+								// console.log(bottle2)
+								render();
+							});
+
+							loader.load("scene.glb", function (gltf) {
+								bottle3 = gltf.scene;
+								bottle3.rotation.y = -2.8;
+								bottle3.rotation.z = -0.2;
+
+
+								bottle3.position.y = -9.4;
+								bottle3.position.z = 2.4;
+
+								
+								bottle3.position.x = 2;
+								bottle3.traverse(function (child) {
+								if (child.isMesh) {
+								}
+								});
+								bottle3.scale.set(50,50,50);
+								scene.add(bottle3);
+								// console.log(bottle3)
+								
+							});
 						
 				render();
 
@@ -563,3 +630,15 @@
 	</body>
 
 </html>
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
