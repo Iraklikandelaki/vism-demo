@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - postprocessing - unreal bloom selective</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+	</head>
+	<body>
+
+		
+		<script id="vertexShader2" type="x-shader/x-vertex">
+			varying vec2 vUv;
+			varying vec3 vPosition;
+			varying vec3 vNormal;
+			uniform float time;
+			uniform vec2 u_mouse;
+			void main() {
+			  vUv = uv;
+			  vNormal = normal;
+			  vPosition = position;
+					  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+				  }
+		  </script>
+		  <script id="fragmentShader2" type="x-shader/x-fragment">
+			varying vec2 vUv;
+			varying vec3 vPosition;
+			varying vec3 vNormal;
+			uniform float time;
+			uniform vec2 u_mouse;
+	  
+			//	Classic Perlin 3D Noise 
+	  //	by Stefan Gustavson
+	  //
+	  vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+	  vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+	  vec3 fade(vec3 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
+	  
+	  float cnoise(vec3 P){
+		vec3 Pi0 = floor(P); // Integer part for indexing
+		vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
+		Pi0 = mod(Pi0, 289.0);
+		Pi1 = mod(Pi1, 289.0);
+		vec3 Pf0 = fract(P); // Fractional part for interpolation
+		vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
+		vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+		vec4 iy = vec4(Pi0.yy, Pi1.yy);
+		vec4 iz0 = Pi0.zzzz;
+		vec4 iz1 = Pi1.zzzz;
+	  
+		vec4 ixy = permute(permute(ix) + iy);
+		vec4 ixy0 = permute(ixy + iz0);
+		vec4 ixy1 = permute(ixy + iz1);
+	  
+		vec4 gx0 = ixy0 / 7.0;
+		vec4 gy0 = fract(floor(gx0) / 7.0) - 0.5;
+		gx0 = fract(gx0);
+		vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+		vec4 sz0 = step(gz0, vec4(0.0));
+		gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+		gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+	  
+		vec4 gx1 = ixy1 / 7.0;
+		vec4 gy1 = fract(floor(gx1) / 7.0) - 0.5;
+		gx1 = fract(gx1);
+		vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+		vec4 sz1 = step(gz1, vec4(0.0));
+		gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+		gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+	  
+		vec3 g000 = vec3(gx0.x,gy0.x,gz0.x);
+		vec3 g100 = vec3(gx0.y,gy0.y,gz0.y);
+		vec3 g010 = vec3(gx0.z,gy0.z,gz0.z);
+		vec3 g110 = vec3(gx0.w,gy0.w,gz0.w);
+		vec3 g001 = vec3(gx1.x,gy1.x,gz1.x);
+		vec3 g101 = vec3(gx1.y,gy1.y,gz1.y);
+		vec3 g011 = vec3(gx1.z,gy1.z,gz1.z);
+		vec3 g111 = vec3(gx1.w,gy1.w,gz1.w);
+	  
+		vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
+		g000 *= norm0.x;
+		g010 *= norm0.y;
+		g100 *= norm0.z;
+		g110 *= norm0.w;
+		vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
+		g001 *= norm1.x;
+		g011 *= norm1.y;
+		g101 *= norm1.z;
+		g111 *= norm1.w;
+	  
+		float n000 = dot(g000, Pf0);
+		float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+		float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+		float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+		float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+		float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+		float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+		float n111 = dot(g111, Pf1);
+	  
+		vec3 fade_xyz = fade(Pf0);
+		vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
+		vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
+		float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x); 
+		return 2.2 * n_xyz;
+	  }
+			void main() {
+			  vec3 a = vec3(0.5, 0.5, 0.5);
+			  vec3 b = vec3(0.5, 0.5, 0.5);
+			  vec3 c = vec3(2.0, 1.0, 0.0);
+			  vec3 d = vec3(0.70, 0.20, 0.25);
+	  
+			  //float diff = abs(dot(vNormal,normalize(vec3(1.,1.,2.1)))) + abs(dot(vNormal,normalize(vec3(1.,-1.,0.))));
+			  float diff = abs(dot(vNormal,normalize(vec3(0.5,0.3,1.1))));
+	  
+			 // float noise = 0.5*(cnoise(vPosition/5.2) + -0.05 + u_mouse.x*0.0002);
+			 float noise = 0.9*(cnoise(vPosition/9.) + sin(time*2.)/5.);
+			  
+			  float step = smoothstep(0.1,0.09,noise);
+	  
+			  vec4 color = vec4(0.014,0.001,0.035, 1.0);
+			  //vec4 color = vec4(0.565,0.001,0.104*sin(time), 1.0);
+			  
+	  
+			  
+	  
+			  vec3 animatedColor = a + b * cos(2.*3.1415926*(c*diff*4.+d + time/3.));
+			  vec4 final = mix(color, vec4(0.2*sin(time/5.),0.002,0.090,1.), step);
+			  //vec4 final = mix(color, vec4(animatedColor,1.), step);
+	  
+	  
+			//  gl_FragColor = vec4(vNormal,1.0);
+		   // gl_FragColor = vec4(step,step,step,1.);
+		   // gl_FragColor = vec4(animatedColor,1.);
+		   gl_FragColor = final;
+			}
+		  </script>
+
+		<script type="x-shader/x-vertex" id="vertexshader">
+
+			varying vec2 vUv;
+
+			void main() {
+
+				vUv = uv;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform sampler2D baseTexture;
+			uniform sampler2D bloomTexture;
+
+			varying vec2 vUv;
+
+			void main() {
+
+				gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
+
+			}
+
+		</script>
+
+		<script type="module">
+
+			import * as THREE from './build/three.module.js';
+
+			import { GUI } from './jsm/libs/dat.gui.module.js';
+
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
+			import { RenderPass } from './jsm/postprocessing/RenderPass.js';
+			import { ShaderPass } from './jsm/postprocessing/ShaderPass.js';
+			import { UnrealBloomPass } from './jsm/postprocessing/UnrealBloomPass.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+
+			const ENTIRE_SCENE = 0, BLOOM_SCENE = 1;
+
+			const bloomLayer = new THREE.Layers();
+			bloomLayer.set( BLOOM_SCENE );
+			let sphere;
+			let movableObjs = [];
+			let uniforms2;
+			let bottle2, bottle3, orbit, pointlight3;
+			const clock = new THREE.Clock();
+			const params = {
+				exposure: 1,
+				bloomStrength: 5,
+				bloomThreshold: 0,
+				bloomRadius: 0,
+				scene: "Scene with Glow"
+			};
+
+			const darkMaterial = new THREE.MeshBasicMaterial( { color: "black" } );
+			const materials = {};
+
+			const renderer = new THREE.WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.toneMapping = THREE.ReinhardToneMapping;
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new THREE.Scene();
+
+			const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 200 );
+			// camera.position.set( 0, 0, 20 );
+			camera.position.set(0, 0.6, -28);
+			camera.lookAt( 0, 0, 0 );
+
+			const controls = new OrbitControls( camera, renderer.domElement );
+			controls.maxPolarAngle = Math.PI * 0.5;
+			controls.minDistance = 1;
+			controls.maxDistance = 100;
+			controls.addEventListener( 'change', render );
+
+			// scene.add( new THREE.AmbientLight( 0x404040, 1 ) );
+
+			const light = new THREE.AmbientLight( 0x404040, 2 ); // soft white light
+			scene.add( light );
+
+			const renderScene = new RenderPass( scene, camera );
+
+			const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+			bloomPass.threshold = params.bloomThreshold;
+			bloomPass.strength = params.bloomStrength;
+			bloomPass.radius = params.bloomRadius;
+
+			const bloomComposer = new EffectComposer( renderer );
+			bloomComposer.renderToScreen = false;
+			bloomComposer.addPass( renderScene );
+			bloomComposer.addPass( bloomPass );
+
+			const finalPass = new ShaderPass(
+				new THREE.ShaderMaterial( {
+					uniforms: {
+						baseTexture: { value: null },
+						bloomTexture: { value: bloomComposer.renderTarget2.texture }
+					},
+					vertexShader: document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+					defines: {}
+				} ), "baseTexture"
+			);
+			finalPass.needsSwap = true;
+
+			const finalComposer = new EffectComposer( renderer );
+			finalComposer.addPass( renderScene );
+			finalComposer.addPass( finalPass );
+
+			const raycaster = new THREE.Raycaster();
+
+			const mouse = new THREE.Vector2();
+
+			// window.addEventListener( 'pointerdown', onPointerDown );
+			// window.addEventListener( 'mousemove', onPointerDown );
+
+			const gui = new GUI();
+
+			gui.add( params, 'scene', [ 'Scene with Glow', 'Glow only', 'Scene only' ] ).onChange( function ( value ) {
+
+				switch ( value ) 	{
+
+					case 'Scene with Glow':
+						bloomComposer.renderToScreen = false;
+						break;
+					case 'Glow only':
+						bloomComposer.renderToScreen = true;
+						break;
+					case 'Scene only':
+						// nothing to do
+						break;
+
+				}
+
+				render();
+
+			} );
+
+			const folder = gui.addFolder( 'Bloom Parameters' );
+
+			folder.add( params, 'exposure', 0.1, 2 ).onChange( function ( value ) {
+
+				renderer.toneMappingExposure = Math.pow( value, 4.0 );
+				render();
+
+			} );
+
+			folder.add( params, 'bloomThreshold', 0.0, 1.0 ).onChange( function ( value ) {
+
+				bloomPass.threshold = Number( value );
+				render();
+
+			} );
+
+			folder.add( params, 'bloomStrength', 0.0, 10.0 ).onChange( function ( value ) {
+
+				bloomPass.strength = Number( value );
+				render();
+
+			} );
+
+			folder.add( params, 'bloomRadius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+
+				bloomPass.radius = Number( value );
+				render();
+
+			} );
+
+			setupScene();
+
+			// function onPointerDown( event ) {
+
+			// 	event.preventDefault();
+
+			// 	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+			// 	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+			// 	raycaster.setFromCamera( mouse, camera );
+			// 	const intersects = raycaster.intersectObjects( scene.children );
+			// 	if ( intersects.length > 0 ) {
+
+			// 		const object = intersects[ 0 ].object;
+			// 		// object.layers.toggle( BLOOM_SCENE );
+			// 			object.layers.enable( BLOOM_SCENE );
+			// 		render();
+
+			// 	}
+
+			// }
+
+			window.onresize = function () {
+
+				const width = window.innerWidth;
+				const height = window.innerHeight;
+
+				camera.aspect = width / height;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( width, height );
+
+				bloomComposer.setSize( width, height );
+				finalComposer.setSize( width, height );
+
+				render();
+
+			};
+
+			function setupScene() {
+
+				scene.traverse( disposeMaterial );
+				scene.children.length = 0;
+
+				const geometry = new THREE.SphereGeometry( 0.3, 60 );
+
+				for ( let i = 0; i < 300; i ++ ) {
+
+					const color = new THREE.Color();
+					color.setHSL( Math.random(), 0.8, Math.random() * 0.2 + 0.05 );
+
+					const material = new THREE.MeshBasicMaterial( { color: color } );
+					
+					sphere = new THREE.Mesh( geometry, material );
+			// numbers between 20-60		Math.random() * (60 - 20) + 20;
+					sphere.position.x = Math.random() * 70 - 2;
+					sphere.position.y = Math.floor(Math.random() * 10); 
+					sphere.position.z = Math.random() * 1000 - 2;
+					sphere.position.normalize().multiplyScalar( Math.random() * 4.0 + 2.0 );
+					// sphere.scale.setScalar( Math.random() * Math.random() + 0.5 );
+					scene.add( sphere );
+					movableObjs.push(sphere);
+					console.log(movableObjs)
+					// console.log(scene.children)
+					sphere.layers.enable( BLOOM_SCENE );
+
+				}
+
+				// var radius = 10;
+				// var turns = 3;
+				// var objPerTurn = 30;
+
+				// var angleStep = (Math.PI * 2) / objPerTurn;
+				// var heightStep = 0.5;
+
+				// var geom = new THREE.SphereGeometry(0.5, 50, 50);
+
+				// for (let i = 0; i < turns * objPerTurn; i++) {
+				// let plane = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({
+				// 	color: Math.random() * 0x888888 + 0x888888
+				// }));
+
+				// // position
+				// plane.position.set(
+				// 	Math.cos(angleStep * i) * radius,
+				// 	heightStep * i,
+				// 	Math.sin(angleStep * i) * radius
+				// );
+
+				// // rotation
+				// plane.rotation.y = -angleStep * i;
+
+				// scene.add(plane);
+				// plane.layers.enable( BLOOM_SCENE );
+				// }
+				var geometryplane = new THREE.SphereGeometry(80, 80, 200);
+
+						uniforms2 = {
+						time: {value: 0},
+						u_mouse: { type: "v2", value: new THREE.Vector2() },
+						};
+
+						var materialplane = new THREE.ShaderMaterial({
+						// side: THREE.DoubleSide,
+						side: THREE.BackSide,
+						uniforms: uniforms2,
+						vertexShader: document.getElementById("vertexShader2").textContent,
+						fragmentShader: document.getElementById("fragmentShader2").textContent,
+						});
+
+						var mesh2 = new THREE.Mesh(geometryplane, materialplane);
+						scene.add(mesh2);
+
+						const pointlight = new THREE.PointLight(0xffffff, 2, 2200);
+					pointlight.position.set(0, 0.6, -70);
+					scene.add(pointlight);
+
+					const pointlight2 = new THREE.PointLight(0xFFA500, 2, 2200);
+					pointlight2.position.set(0, 10, -70);
+					scene.add(pointlight2);
+
+					pointlight3 = new THREE.PointLight(0xFFA500, 1.5, 2200);
+					pointlight3.position.set(-20, 0, 90);
+					scene.add(pointlight3);
+
+					const pointlight4 = new THREE.PointLight(0xFFA500, 1.5, 2200);
+					pointlight4.position.set(20, 0, 90);
+					scene.add(pointlight4);
+						
+						const loader = new GLTFLoader().setPath("./glbbottle/");
+							loader.load("scene.glb", function (gltf) {
+								bottle2 = gltf.scene;
+								bottle2.rotation.y = -2.8;
+								bottle2.position.y = -9.4;
+								bottle2.position.x = 3;
+								bottle2.traverse(function (child) {
+								if (child.isMesh) {
+								}
+								});
+								bottle2.scale.set(50,50,50);
+								scene.add(bottle2);
+								console.log(bottle2)
+								render();
+							});
+
+							loader.load("scene.glb", function (gltf) {
+								bottle3 = gltf.scene;
+								bottle3.rotation.y = -2.8;
+								bottle3.rotation.z = -0.2;
+
+
+								bottle3.position.y = -9.4;
+								bottle3.position.z = 2.4;
+
+								
+								bottle3.position.x = 2;
+								bottle3.traverse(function (child) {
+								if (child.isMesh) {
+								}
+								});
+								bottle3.scale.set(50,50,50);
+								scene.add(bottle3);
+								// console.log(bottle3)
+								
+							});
+						
+				render();
+
+			}
+
+			document.addEventListener('mousemove', function(e){
+    			let scale = -0.01;
+					orbit.rotateY( e.movementX / 500 );
+				// orbit.rotateX( e.movementY * scale ); 
+				orbit.rotation.z = 0; //this is important to keep the camera level..
+				})
+				
+				//the camera rotation pivot
+				orbit = new THREE.Object3D();
+				orbit.rotation.order = "YXZ"; //this is important to keep level, so Z should be the last axis to rotate in order...
+				if(bottle2) orbit.position.copy( bottle2.position );
+				scene.add(orbit );
+				orbit.add( camera );
+
+
+
+
+			function disposeMaterial( obj ) {
+
+				if ( obj.material ) {
+
+					obj.material.dispose();
+
+				}
+
+			}
+
+			function render() {
+				const time = Date.now() * 0.0001;
+				
+				switch ( params.scene ) {
+
+					case 'Scene only':
+						renderer.render( scene, camera );
+						break;
+					case 'Glow only':
+						renderBloom( false );
+						break;
+					case 'Scene with Glow':
+					default:
+						// render scene with bloom
+						renderBloom( true );
+
+						// render the entire scene, then render bloom scene on top
+						finalComposer.render();
+						break;
+
+				}
+				// pointlight3.position.x = Math.cos( time * 20.7 ) * 285;
+				for (let i = 0; i < movableObjs.length; i++) {
+			
+					const sphere = movableObjs[ i ];
+					sphere.position.x = Math.cos( time + i * 100.7 ) * 45;
+					sphere.position.y = Math.sin( time + i * 3.1 ) * 15;
+					sphere.position.z = Math.sin( time + i * 1.1 ) * 25;
+			
+					
+				}
+			
+
+			}
+
+			function renderBloom( mask ) {
+
+				if ( mask === true ) {
+
+					scene.traverse( darkenNonBloomed );
+					bloomComposer.render();
+					scene.traverse( restoreMaterial );
+
+				} else {
+
+					camera.layers.set( BLOOM_SCENE );
+					bloomComposer.render();
+					camera.layers.set( ENTIRE_SCENE );
+
+				}
+
+			}
+
+			function darkenNonBloomed( obj ) {
+
+				if ( obj.isMesh && bloomLayer.test( obj.layers ) === false ) {
+
+					materials[ obj.uuid ] = obj.material;
+					obj.material = darkMaterial;
+
+				}
+
+			}
+
+			function restoreMaterial( obj ) {
+
+				if ( materials[ obj.uuid ] ) {
+
+					obj.material = materials[ obj.uuid ];
+					delete materials[ obj.uuid ];
+
+				}
+
+			}
+			var animate = function () {
+        requestAnimationFrame(animate);
+
+				// sphere.rotation.x += 50;
+				
+				uniforms2.time.value += clock.getDelta();
+				
+				render();
+
+			}
+			animate();
+
+		</script>
+
+	</body>
+
+</html>
